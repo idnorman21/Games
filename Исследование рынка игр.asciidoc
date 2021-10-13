@@ -1,0 +1,3989 @@
+﻿
+*Описание проекта*
+
+Мы работаем в интернет-магазине «Стримчик», который продаёт по всему
+миру компьютерные игры. Из открытых источников доступны исторические
+данные о продажах игр, оценки пользователей и экспертов, жанры и
+платформы (например, Xbox или PlayStation). Нам нужно выявить
+определяющие успешность игры закономерности. Это позволит сделать ставку
+на потенциально популярный продукт и спланировать рекламные кампании.
+
+Перед нами данные до 2016 года. Представим, что сейчас декабрь 2016 г.,
+и мы планируем кампанию на 2017-й. Нужно отработать принцип работы с
+данными. Не важно, прогнозируем ли мы продажи на 2017 год по данным
+2016-го или же 2027-й — по данным 2026 года.
+
+*Описание данных games.csv*
+
+Name — название игры
+
+Platform — платформа
+
+Year_of_Release — год выпуска
+
+Genre — жанр игры
+
+NA_sales — продажи в Северной Америке (миллионы долларов)
+
+EU_sales — продажи в Европе (миллионы долларов)
+
+JP_sales — продажи в Японии (миллионы долларов)
+
+Other_sales — продажи в других странах (миллионы долларов)
+
+Critic_Score — оценка критиков (от 0 до 100)
+
+User_Score — оценка пользователей (от 0 до 10)
+
+Rating — рейтинг от организации ESRB (англ. Entertainment Software
+Rating Board). Эта ассоциация определяет рейтинг компьютерных игр и
+присваивает им подходящую возрастную категорию.
+
+Данные за 2016 год могут быть неполными.
+
+Импортируем библиотеку Pandas для анализа данных по проекту
+
+
++*In[1]:*+
+[source, ipython3]
+----
+import pandas as pd
+----
+
+Импортируем библиотеки seaborn и matplotlib для создания графиков.
+
+
++*In[2]:*+
+[source, ipython3]
+----
+import seaborn as sns
+----
+
+
++*In[3]:*+
+[source, ipython3]
+----
+import matplotlib.pyplot as plt
+----
+
+Импортируем библиотеку numpy для подсчёта статистических показателей.
+
+
++*In[4]:*+
+[source, ipython3]
+----
+import numpy as np
+----
+
+Импортируем из библиотеки scipy статические методы для анализа
+статистики.
+
+
++*In[5]:*+
+[source, ipython3]
+----
+from scipy import stats as st
+----
+
+Прочитаем файл games.csv и сохраним его в переменной games
+
+
++*In[6]:*+
+[source, ipython3]
+----
+games = pd.read_csv('/datasets/games.csv')
+----
+
+Изучим общую информацию о файле
+
+
++*In[7]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[7]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 16715 entries, 0 to 16714
+Data columns (total 11 columns):
+Name               16713 non-null object
+Platform           16715 non-null object
+Year_of_Release    16446 non-null float64
+Genre              16713 non-null object
+NA_sales           16715 non-null float64
+EU_sales           16715 non-null float64
+JP_sales           16715 non-null float64
+Other_sales        16715 non-null float64
+Critic_Score       8137 non-null float64
+User_Score         10014 non-null object
+Rating             9949 non-null object
+dtypes: float64(6), object(5)
+memory usage: 1.4+ MB
+----
+
+== Этап 2. Подготовка данных.
+
+Получим из таблицы названия столбцов.
+
+
++*In[8]:*+
+[source, ipython3]
+----
+games.columns
+----
+
+
++*Out[8]:*+
+----Index(['Name', 'Platform', 'Year_of_Release', 'Genre', 'NA_sales', 'EU_sales',
+       'JP_sales', 'Other_sales', 'Critic_Score', 'User_Score', 'Rating'],
+      dtype='object')----
+
+Приведём названия столбцов к нижнему регистру и проверим результат.
+
+
+
++*In[9]:*+
+[source, ipython3]
+----
+games.columns = games.columns.str.lower()
+----
+
+
++*In[10]:*+
+[source, ipython3]
+----
+games.columns
+----
+
+
++*Out[10]:*+
+----Index(['name', 'platform', 'year_of_release', 'genre', 'na_sales', 'eu_sales',
+       'jp_sales', 'other_sales', 'critic_score', 'user_score', 'rating'],
+      dtype='object')----
+
+Изменим тип данных в столбце `year_of_release' (год выпуска) с float64
+на int.
+
+Нам мешают значения NaN. Избавимся от них.
+
+
++*In[11]:*+
+[source, ipython3]
+----
+games['year_of_release'].isnull().sum()
+----
+
+
++*Out[11]:*+
+----269----
+
+Их не очень много. Удаляем эти значения.
+
+
++*In[170]:*+
+[source, ipython3]
+----
+games.dropna(subset = ['year_of_release'])
+----
+
+
++*Out[170]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|0 |Wii Sports |Wii |2006 |Sports |41.36 |28.96 |3.77 |8.45 |76.000000
+|8.00000 |E |82.54
+
+|1 |Super Mario Bros. |NES |1985 |Platform |29.08 |3.58 |6.81 |0.77
+|68.994363 |7.12633 |tbd |40.24
+
+|2 |Mario Kart Wii |Wii |2008 |Racing |15.68 |12.76 |3.79 |3.29
+|82.000000 |8.30000 |E |35.52
+
+|3 |Wii Sports Resort |Wii |2009 |Sports |15.61 |10.93 |3.28 |2.95
+|80.000000 |8.00000 |E |32.77
+
+|4 |Pokemon Red/Pokemon Blue |GB |1996 |Role-Playing |11.27 |8.89 |10.22
+|1.00 |68.994363 |7.12633 |tbd |31.38
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16710 |Samurai Warriors: Sanada Maru |PS3 |2016 |Action |0.00 |0.00
+|0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16711 |LMA Manager 2007 |X360 |2006 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16712 |Haitaka no Psychedelica |PSV |2016 |Adventure |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16713 |Spirits & Spells |GBA |2003 |Platform |0.01 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16714 |Winning Post 8 2016 |PSV |2016 |Simulation |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+|===
+
+16444 rows × 12 columns
+----
+
+
+
++*In[13]:*+
+[source, ipython3]
+----
+games['year_of_release'].isnull().sum()
+----
+
+
++*Out[13]:*+
+----0----
+
+
++*In[14]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[14]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16446 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16446 non-null object
+year_of_release    16446 non-null float64
+genre              16444 non-null object
+na_sales           16446 non-null float64
+eu_sales           16446 non-null float64
+jp_sales           16446 non-null float64
+other_sales        16446 non-null float64
+critic_score       7983 non-null float64
+user_score         9839 non-null object
+rating             9768 non-null object
+dtypes: float64(6), object(5)
+memory usage: 1.5+ MB
+----
+
+Теперь заменим тип данных в столбце year_of_release с float64 на int и
+проверим результат.
+
+
++*In[15]:*+
+[source, ipython3]
+----
+games['year_of_release'] = games['year_of_release'].astype('int')
+----
+
+
++*In[16]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[16]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16446 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16446 non-null object
+year_of_release    16446 non-null int64
+genre              16444 non-null object
+na_sales           16446 non-null float64
+eu_sales           16446 non-null float64
+jp_sales           16446 non-null float64
+other_sales        16446 non-null float64
+critic_score       7983 non-null float64
+user_score         9839 non-null object
+rating             9768 non-null object
+dtypes: float64(5), int64(1), object(5)
+memory usage: 1.5+ MB
+----
+
+Изменим тип данных в столбце `user_score' (оценки пользователей) с
+`object' на `float64'.
+
+
++*In[17]:*+
+[source, ipython3]
+----
+games['user_score'] = pd.to_numeric(games['user_score'], errors = 'coerce')
+----
+
+Проверяем результат.
+
+
++*In[18]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[18]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16446 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16446 non-null object
+year_of_release    16446 non-null int64
+genre              16444 non-null object
+na_sales           16446 non-null float64
+eu_sales           16446 non-null float64
+jp_sales           16446 non-null float64
+other_sales        16446 non-null float64
+critic_score       7983 non-null float64
+user_score         7463 non-null float64
+rating             9768 non-null object
+dtypes: float64(6), int64(1), object(4)
+memory usage: 1.5+ MB
+----
+
+Теперь избавимся от пропусков.
+
+Пропусков в столбцах `name' и `genre' всего 2. Они, вероятнее всего,
+полностью случайны, восстановить их по другим значениям мы не сможем, а
+значит, их можно удалить.
+
+
++*In[19]:*+
+[source, ipython3]
+----
+games.dropna(subset = ['name'])
+----
+
+
++*In[20]:*+
+[source, ipython3]
+----
+games.dropna(subset = ['genre'])
+----
+
+Комментарий студента:
+
+Здесь также удалил атрибут *inplace*.
+
+Проверим результат.
+
+
++*In[21]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[21]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16444 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16444 non-null object
+year_of_release    16444 non-null int64
+genre              16444 non-null object
+na_sales           16444 non-null float64
+eu_sales           16444 non-null float64
+jp_sales           16444 non-null float64
+other_sales        16444 non-null float64
+critic_score       7983 non-null float64
+user_score         7463 non-null float64
+rating             9768 non-null object
+dtypes: float64(6), int64(1), object(4)
+memory usage: 1.5+ MB
+----
+
+Пропуски в столбцах `critic_score' и `user_score' могли возникнуть из-за
+отсутствия оценок как таковых или ошибок при кодировке. Лучше всего
+будет заменить их на средние значения, т.к. реальные мы либо не узнаем,
+либо, что самое главное, их может не быть вовсе.
+
+Сначала найдём эти средние значения.
+
+
++*In[22]:*+
+[source, ipython3]
+----
+critic_score_avg = games['critic_score'].mean()
+----
+
+
++*In[23]:*+
+[source, ipython3]
+----
+user_score_avg = games['user_score'].mean()
+----
+
+
++*In[24]:*+
+[source, ipython3]
+----
+critic_score_avg
+----
+
+
++*Out[24]:*+
+----68.99436302142053----
+
+
++*In[25]:*+
+[source, ipython3]
+----
+user_score_avg
+----
+
+
++*Out[25]:*+
+----7.126329894144447----
+
+По шкале от 0 до 100 и от 0 до 10 эти средние оценки вполне реалистичны.
+Заменим на них отсутствующие значения.
+
+
++*In[26]:*+
+[source, ipython3]
+----
+games['critic_score'] = games['critic_score'].fillna(value = critic_score_avg)
+----
+
+
++*In[27]:*+
+[source, ipython3]
+----
+games['user_score'] = games['user_score'].fillna(value = user_score_avg)
+----
+
+
+Проверим результат.
+
+
++*In[28]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[28]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16444 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16444 non-null object
+year_of_release    16444 non-null int64
+genre              16444 non-null object
+na_sales           16444 non-null float64
+eu_sales           16444 non-null float64
+jp_sales           16444 non-null float64
+other_sales        16444 non-null float64
+critic_score       16444 non-null float64
+user_score         16444 non-null float64
+rating             9768 non-null object
+dtypes: float64(6), int64(1), object(4)
+memory usage: 1.5+ MB
+----
+
+Обработаем пропущенные значения в последнем столбце — `rating'.
+Присутствующее там сокращение `tbd' означает ``to be determined''
+(``будет определено''), что для нас обозначает неизвестное пока
+значение.
+
+Поскольку данные в этом столбце имеют строковый тип, обработаем пропуска
+в нём путём замены на значение `tbd' всех пропусков. Данная аббревиатура
+общепринята среди геймерского сообщества, и её значение известно всем
+профессионалам в этой сфере, и поэтому мы можем заменить на неё все
+неизвестные значения, зная, что это сокращение в таблице будет
+истолковано правильно.
+
+
++*In[29]:*+
+[source, ipython3]
+----
+games['rating'] = games['rating'].fillna('tbd')
+----
+
+Проверим итоговый результат.
+
+
++*In[30]:*+
+[source, ipython3]
+----
+games.info()
+----
+
+
++*Out[30]:*+
+----
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 16444 entries, 0 to 16714
+Data columns (total 11 columns):
+name               16444 non-null object
+platform           16444 non-null object
+year_of_release    16444 non-null int64
+genre              16444 non-null object
+na_sales           16444 non-null float64
+eu_sales           16444 non-null float64
+jp_sales           16444 non-null float64
+other_sales        16444 non-null float64
+critic_score       16444 non-null float64
+user_score         16444 non-null float64
+rating             16444 non-null object
+dtypes: float64(6), int64(1), object(4)
+memory usage: 1.5+ MB
+----
+
+Данные очищены. Можно идти дальше.
+
+Создадим новый столбец `total_sales' — суммарные продажи всех игр по
+всему миру и добавим его в таблицу games.
+
+
++*In[31]:*+
+[source, ipython3]
+----
+games['total_sales'] =  games['na_sales'] + games['eu_sales'] + games['jp_sales'] + games['other_sales']
+----
+
+Теперь посмотрим на обновлённую таблицу.
+
+
++*In[32]:*+
+[source, ipython3]
+----
+games
+----
+
+
++*Out[32]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|0 |Wii Sports |Wii |2006 |Sports |41.36 |28.96 |3.77 |8.45 |76.000000
+|8.00000 |E |82.54
+
+|1 |Super Mario Bros. |NES |1985 |Platform |29.08 |3.58 |6.81 |0.77
+|68.994363 |7.12633 |tbd |40.24
+
+|2 |Mario Kart Wii |Wii |2008 |Racing |15.68 |12.76 |3.79 |3.29
+|82.000000 |8.30000 |E |35.52
+
+|3 |Wii Sports Resort |Wii |2009 |Sports |15.61 |10.93 |3.28 |2.95
+|80.000000 |8.00000 |E |32.77
+
+|4 |Pokemon Red/Pokemon Blue |GB |1996 |Role-Playing |11.27 |8.89 |10.22
+|1.00 |68.994363 |7.12633 |tbd |31.38
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16710 |Samurai Warriors: Sanada Maru |PS3 |2016 |Action |0.00 |0.00
+|0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16711 |LMA Manager 2007 |X360 |2006 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16712 |Haitaka no Psychedelica |PSV |2016 |Adventure |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16713 |Spirits & Spells |GBA |2003 |Platform |0.01 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16714 |Winning Post 8 2016 |PSV |2016 |Simulation |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+|===
+
+16444 rows × 12 columns
+----
+
+== Этап 3. Исследовательский анализ данных.
+
+Посчитаем количество игр, выпущенных в разные годы.
+
+
++*In[33]:*+
+[source, ipython3]
+----
+games.groupby('year_of_release')['name'].count()
+----
+
+
++*Out[33]:*+
+----year_of_release
+1980       9
+1981      46
+1982      36
+1983      17
+1984      14
+1985      14
+1986      21
+1987      16
+1988      15
+1989      17
+1990      16
+1991      41
+1992      43
+1993      60
+1994     121
+1995     219
+1996     263
+1997     289
+1998     379
+1999     338
+2000     350
+2001     482
+2002     829
+2003     775
+2004     762
+2005     939
+2006    1006
+2007    1197
+2008    1427
+2009    1426
+2010    1255
+2011    1136
+2012     653
+2013     544
+2014     581
+2015     606
+2016     502
+Name: name, dtype: int64----
+
+Представим эти данные графически, чтобы нагляднее видеть тенденции.
+
+
++*In[34]:*+
+[source, ipython3]
+----
+games_by_years = games.pivot_table(index = 'year_of_release', values = 'name', aggfunc = 'count')
+plt.figure(figsize = (12,6))
+sns.lineplot(data = games_by_years)
+plt.title("Количество игр, выпущенных в разные годы")
+plt.xlabel("Год выпуска")
+plt.ylabel("Количество выпущенных игр")
+plt.legend('')
+----
+
+
++*Out[34]:*+
+----<matplotlib.legend.Legend at 0x7f2fe22e4bd0>
+![png](output_78_1.png)
+----
+
+
+
+Мы видим уверенный рост индустрии консольных (платформенных) игр до 2008
+г. После этого идёт спад, обусловленный всеобщим распространением
+высокоскоростного Интернета и мобильных телефонов, что в свою очередь
+сделало наиболее популярными онлайн-игры и резко снизило число
+пользователей игровых приставок.
+
+Далее нас будут интересовать только трёх- и четырёхзначные числа из
+полученной нами выборки, т. к. двузначные количества слишком малы и
+относятся к данным за тот период, когда игровая индустрия была по своему
+уровню развития ещё очень далека от современной. Следовательно,
+использование таких старых данных сделает выборку нерепрезентативной и
+будет искажать результаты исследования.
+
+Чтобы исследовать репрезентативную выборку, создадим новую таблицу, в
+которой будут данные, начиная с 1994 г. (это год, когда количество
+выпущенных игр впервые стало трёхзначным, в 2 раза превысив показатель
+предыдущего года (121 игра в 1994 г. против 60 в 1993 г.)) Назовём новую
+таблицу games_good_data.
+
+
++*In[35]:*+
+[source, ipython3]
+----
+games_good_data = games.query('year_of_release > 1993')
+----
+
+Посмотрим на неё.
+
+
++*In[36]:*+
+[source, ipython3]
+----
+games_good_data
+----
+
+
++*Out[36]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|0 |Wii Sports |Wii |2006 |Sports |41.36 |28.96 |3.77 |8.45 |76.000000
+|8.00000 |E |82.54
+
+|2 |Mario Kart Wii |Wii |2008 |Racing |15.68 |12.76 |3.79 |3.29
+|82.000000 |8.30000 |E |35.52
+
+|3 |Wii Sports Resort |Wii |2009 |Sports |15.61 |10.93 |3.28 |2.95
+|80.000000 |8.00000 |E |32.77
+
+|4 |Pokemon Red/Pokemon Blue |GB |1996 |Role-Playing |11.27 |8.89 |10.22
+|1.00 |68.994363 |7.12633 |tbd |31.38
+
+|6 |New Super Mario Bros. |DS |2006 |Platform |11.28 |9.14 |6.50 |2.88
+|89.000000 |8.50000 |E |29.80
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16710 |Samurai Warriors: Sanada Maru |PS3 |2016 |Action |0.00 |0.00
+|0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16711 |LMA Manager 2007 |X360 |2006 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16712 |Haitaka no Psychedelica |PSV |2016 |Adventure |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16713 |Spirits & Spells |GBA |2003 |Platform |0.01 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16714 |Winning Post 8 2016 |PSV |2016 |Simulation |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+|===
+
+16079 rows × 12 columns
+----
+
+Посмотрим на cуммы продаж по платформам, обозначив их переменной
+sales_by_platform. Cоздадим для этого сводную таблицу и отсортируем её
+по убыванию.
+
+
++*In[37]:*+
+[source, ipython3]
+----
+sales_by_platform = games_good_data.pivot_table(index = 'platform', values = 'total_sales', aggfunc = 'sum').sort_values(by = 'total_sales', ascending = False).reset_index()
+----
+
+
++*In[38]:*+
+[source, ipython3]
+----
+sales_by_platform
+----
+
+
++*Out[38]:*+
+----
+[cols=",,",options="header",]
+|===
+| |platform |total_sales
+|0 |PS2 |1233.56
+|1 |X360 |961.24
+|2 |PS3 |931.34
+|3 |Wii |891.18
+|4 |DS |802.76
+|5 |PS |727.58
+|6 |PS4 |314.14
+|7 |GBA |312.88
+|8 |PSP |289.53
+|9 |3DS |257.81
+|10 |PC |252.66
+|11 |XB |251.57
+|12 |N64 |218.01
+|13 |GC |196.73
+|14 |XOne |159.32
+|15 |GB |152.08
+|16 |SNES |84.67
+|17 |WiiU |82.19
+|18 |PSV |53.81
+|19 |SAT |33.59
+|20 |DC |15.95
+|21 |GEN |8.13
+|22 |WS |1.42
+|23 |NG |1.23
+|24 |SCD |0.36
+|25 |TG16 |0.16
+|26 |NES |0.11
+|27 |3DO |0.10
+|28 |PCFX |0.03
+|===
+----
+
+Посмотрим на эти данные графически.
+
+
++*In[39]:*+
+[source, ipython3]
+----
+sales_by_platform = games_good_data.pivot_table(
+    index = 'platform', values = 'total_sales', aggfunc = 'sum').sort_values(by = 'total_sales', ascending = False)
+plt.figure(figsize = (13,6))
+sns.barplot(x = sales_by_platform.index,y = sales_by_platform['total_sales'])
+plt.title("Продажи по платформам за весь период")
+plt.xlabel("Название платформы")
+plt.ylabel("Количество продаж")
+----
+
+
++*Out[39]:*+
+----Text(0, 0.5, 'Количество продаж')
+![png](output_89_1.png)
+----
+
+Выберем платформы с наибольшими суммарными продажами.
+
+Оставим 6 самых прибыльных платформ, назвав новую выборку
+max_sales_platforms.
+
+
++*In[40]:*+
+[source, ipython3]
+----
+max_sales_platforms = sales_by_platform.head(6)
+max_sales_platforms = max_sales_platforms.reset_index()
+----
+
+
++*In[41]:*+
+[source, ipython3]
+----
+max_sales_platforms
+----
+
+
++*Out[41]:*+
+----
+[cols=",,",options="header",]
+|===
+| |platform |total_sales
+|0 |PS2 |1233.56
+|1 |X360 |961.24
+|2 |PS3 |931.34
+|3 |Wii |891.18
+|4 |DS |802.76
+|5 |PS |727.58
+|===
+----
+
+Напишем функцию, которая будет возвращать сводную таблицу с
+распределением продаж 6 самых прибыльных платформ по годам с 1994 по
+2016.
+
+
++*In[42]:*+
+[source, ipython3]
+----
+def year_total_sales_by_platform(name, data):
+    platform_data = data[(data['platform'] == name)]
+    total = platform_data.pivot_table(index = 'year_of_release', values = 'total_sales', aggfunc = 'sum').sort_values('year_of_release', ascending = False)
+    return total                                     
+----
+
+Построим график по этой функции.
+
+
++*In[43]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+for i in list(max_sales_platforms['platform']):
+    sns.lineplot(data = year_total_sales_by_platform(i, games)['total_sales'], label=i)
+
+plt.legend()
+----
+
+
++*Out[43]:*+
+----<matplotlib.legend.Legend at 0x7f2fd9805fd0>
+![png](output_97_1.png)
+----
+
+Для ещё большей наглядности посмотрим на график продаж каждой платформы
+отдельно.
+
+
++*In[44]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('PS2', games)['total_sales'], label = 'PS2')
+----
+
+
++*Out[44]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd9999910>
+![png](output_101_1.png)
+----
+
+
++*In[45]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('X360', games)['total_sales'], label = 'X360')
+----
+
+
++*Out[45]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd9911b90>
+![png](output_102_1.png)
+----
+
+
++*In[46]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('PS3', games)['total_sales'], label = 'PS3')
+----
+
+
++*Out[46]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd9862d50>
+![png](output_103_1.png)
+----
+
+
++*In[47]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('Wii', games)['total_sales'], label = 'Wii')
+----
+
+
++*Out[47]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd8766890>
+![png](output_104_1.png)
+----
+
+
++*In[48]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('DS', games)['total_sales'], label = 'DS')
+----
+
+
++*Out[48]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd87564d0>
+![png](output_105_1.png)
+----
+
+
++*In[49]:*+
+[source, ipython3]
+----
+plt.figure(figsize=(12,6))
+plt.title('Количество продаж популярных игровых платформ')
+plt.xlabel('Годы игровых релизов')
+plt.ylabel('Продажи')
+
+sns.lineplot(data = year_total_sales_by_platform('PS', games)['total_sales'], label = 'PS')
+----
+
+
++*Out[49]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd874c050>
+![png](output_106_1.png)
+----
+
+Здесь мы видим подтверждение той тенденции, которая была видна на
+графике ``Количество игр, выпущенных в разные годы'': платформы,
+популярные в 1990-е годы, к началу 2000-х исчезают с рынка; а на их
+место приходят новые, чей пик популярности приходится на 2008 г. (более
+широко — на 2007-2012 гг.), после чего идёт резкий спад, связанный с
+тем, что проникновение Интернета (в том числе мобильного) и онлайн-игр
+становится всеобщим, что полностью меняет облик игровой индустрии —
+платформенные игры уступают место играм онлайн, доступным в любое время
+и в любом месте, и зачастую предоставляемым безплатно.
+
+
+Выведем на экран годы, в которые каждая платформа выпустила свои
+последние игры (max_years) и первые игры (min_years).
+
+
++*In[50]:*+
+[source, ipython3]
+----
+max_years = games_good_data.groupby('platform')['year_of_release'].max() 
+----
+
+
++*In[51]:*+
+[source, ipython3]
+----
+max_years
+----
+
+
++*Out[51]:*+
+----platform
+3DO     1995
+3DS     2016
+DC      2008
+DS      2013
+GB      2001
+GBA     2007
+GC      2007
+GEN     1994
+N64     2002
+NES     1994
+NG      1996
+PC      2016
+PCFX    1996
+PS      2003
+PS2     2011
+PS3     2016
+PS4     2016
+PSP     2015
+PSV     2016
+SAT     1999
+SCD     1994
+SNES    1999
+TG16    1995
+WS      2001
+Wii     2016
+WiiU    2016
+X360    2016
+XB      2008
+XOne    2016
+Name: year_of_release, dtype: int64----
+
+
++*In[52]:*+
+[source, ipython3]
+----
+min_years = games_good_data.groupby('platform')['year_of_release'].min() 
+----
+
+
++*In[53]:*+
+[source, ipython3]
+----
+min_years
+----
+
+
++*Out[53]:*+
+----platform
+3DO     1994
+3DS     2011
+DC      1998
+DS      2004
+GB      1994
+GBA     2000
+GC      2001
+GEN     1994
+N64     1996
+NES     1994
+NG      1994
+PC      1994
+PCFX    1996
+PS      1994
+PS2     2000
+PS3     2006
+PS4     2013
+PSP     2004
+PSV     2011
+SAT     1994
+SCD     1994
+SNES    1994
+TG16    1995
+WS      1999
+Wii     2006
+WiiU    2012
+X360    2005
+XB      2000
+XOne    2013
+Name: year_of_release, dtype: int64----
+
+Определим средний период существования для каждой платформы
+(mean_period) как разницу между годом выхода последних игр (max_years) и
+первых игр (min_years).
+
+
++*In[54]:*+
+[source, ipython3]
+----
+mean_period = max_years - min_years
+----
+
+
++*In[55]:*+
+[source, ipython3]
+----
+mean_period
+----
+
+
++*Out[55]:*+
+----platform
+3DO      1
+3DS      5
+DC      10
+DS       9
+GB       7
+GBA      7
+GC       6
+GEN      0
+N64      6
+NES      0
+NG       2
+PC      22
+PCFX     0
+PS       9
+PS2     11
+PS3     10
+PS4      3
+PSP     11
+PSV      5
+SAT      5
+SCD      0
+SNES     5
+TG16     0
+WS       2
+Wii     10
+WiiU     4
+X360    11
+XB       8
+XOne     3
+Name: year_of_release, dtype: int64----
+
+Найдём среднее значение.
+
+
++*In[56]:*+
+[source, ipython3]
+----
+mean_period.mean()
+----
+
+
++*Out[56]:*+
+----5.931034482758621----
+
+Наш расчёт показал, что среднее время жизни платформы составляет порядка
+6 лет.
+
+Данные за 2016 г. у нас неполные, т.к. по условиям поставленной задачи в
+нашем распоряжении есть статистика на декабрь 2016 г., которая включает
+в себя данные далеко не всех платформ за этот год. Далее определим
+период с 2001 по 2015 гг. как наиболее близкий к современности и имеющий
+наиболее полные и актуальные данные.
+
+
+Создадим для этих данных новую выборку games_actual_data.
+
+
++*In[57]:*+
+[source, ipython3]
+----
+games_actual_data = games_good_data[(games_good_data['year_of_release'] >= 2001) & (games_good_data['year_of_release'] <= 2015)]
+----
+
+Посмотрим на неё.
+
+
++*In[58]:*+
+[source, ipython3]
+----
+games_actual_data
+----
+
+
++*Out[58]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|0 |Wii Sports |Wii |2006 |Sports |41.36 |28.96 |3.77 |8.45 |76.000000
+|8.00000 |E |82.54
+
+|2 |Mario Kart Wii |Wii |2008 |Racing |15.68 |12.76 |3.79 |3.29
+|82.000000 |8.30000 |E |35.52
+
+|3 |Wii Sports Resort |Wii |2009 |Sports |15.61 |10.93 |3.28 |2.95
+|80.000000 |8.00000 |E |32.77
+
+|6 |New Super Mario Bros. |DS |2006 |Platform |11.28 |9.14 |6.50 |2.88
+|89.000000 |8.50000 |E |29.80
+
+|7 |Wii Play |Wii |2006 |Misc |13.96 |9.18 |2.93 |2.84 |58.000000
+|6.60000 |E |28.91
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16707 |Aiyoku no Eustia |PSV |2014 |Misc |0.00 |0.00 |0.01 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16708 |Woody Woodpecker in Crazy Castle 5 |GBA |2002 |Platform |0.01
+|0.00 |0.00 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16709 |SCORE International Baja 1000: The Official Game |PS2 |2008
+|Racing |0.00 |0.00 |0.00 |0.00 |68.994363 |7.12633 |tbd |0.00
+
+|16711 |LMA Manager 2007 |X360 |2006 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16713 |Spirits & Spells |GBA |2003 |Platform |0.01 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+|===
+
+13618 rows × 12 columns
+----
+
+Посмотрим уже на более актуальных данных статистику прибыли платформ,
+построив для этого сводную таблицу, отсортированную по убыванию.
+
+
++*In[59]:*+
+[source, ipython3]
+----
+sales_by_platform = games_actual_data.pivot_table(index = 'platform', values = 'total_sales', aggfunc = 'sum').sort_values(by = 'total_sales', ascending = False).reset_index()
+----
+
+
++*In[60]:*+
+[source, ipython3]
+----
+sales_by_platform
+----
+
+
++*Out[60]:*+
+----
+[cols=",,",options="header",]
+|===
+| |platform |total_sales
+|0 |PS2 |1194.39
+|1 |X360 |959.72
+|2 |PS3 |927.74
+|3 |Wii |891.00
+|4 |DS |802.76
+|5 |GBA |312.81
+|6 |PSP |289.53
+|7 |XB |250.58
+|8 |PS4 |244.89
+|9 |3DS |242.67
+|10 |GC |196.73
+|11 |PC |195.81
+|12 |XOne |133.17
+|13 |WiiU |77.59
+|14 |PSV |49.56
+|15 |PS |44.33
+|16 |GB |9.24
+|17 |N64 |3.33
+|18 |DC |1.42
+|19 |WS |0.28
+|===
+----
+
+Посмотрим на обновлённые данные графически.
+
+
++*In[61]:*+
+[source, ipython3]
+----
+sales_by_platform = games_actual_data.pivot_table(
+    index = 'platform', values = 'total_sales', aggfunc = 'sum').sort_values(by = 'total_sales', ascending = False)
+plt.figure(figsize = (13,6))
+sns.barplot(x = sales_by_platform.index,y = sales_by_platform['total_sales'])
+plt.title("Продажи по платформам за актуальный период")
+plt.xlabel("Название платформы")
+plt.ylabel("Количество продаж")
+----
+
+
++*Out[61]:*+
+----Text(0, 0.5, 'Количество продаж')
+![png](output_133_1.png)
+----
+
+
+Построим график «ящик с усами» по глобальным продажам каждой игры и
+разбивкой по платформам, предварительно создав для него выборку по 5
+самым прибыльным платформам XXI века.
+
+
++*In[62]:*+
+[source, ipython3]
+----
+max_sales_platforms = ['PS2','X360','PS3','Wii','DS']
+top_5_platforms = games_actual_data[games_actual_data['platform'].isin(['PS2','X360','PS3','Wii','DS'])]
+top_5_platforms = top_5_platforms[top_5_platforms['total_sales'] < 1.4]
+
+plt.figure(figsize = (12,6))
+sns.boxplot(data = top_5_platforms, x = 'platform', y = 'total_sales')
+plt.title('Ящик с усами', fontsize = 15)
+plt.xlabel('Платформа', fontsize = 12)
+plt.ylabel('Глобальные продажи',fontsize = 12)
+----
+
+
++*Out[62]:*+
+----Text(0, 0.5, 'Глобальные продажи')
+![png](output_137_1.png)
+----
+
+Опишем результат с помощью метода .describe().
+
+
++*In[63]:*+
+[source, ipython3]
+----
+top_5_platforms['total_sales'].describe()
+----
+
+
++*Out[63]:*+
+----count    7197.000000
+mean        0.282377
+std         0.301779
+min         0.000000
+25%         0.070000
+50%         0.160000
+75%         0.400000
+max         1.390000
+Name: total_sales, dtype: float64----
+
+Посмотрим, как влияют на продажи внутри одной из популярных платформ
+отзывы пользователей и критиков. Для примера выберем самую прибыльную
+платформу PS2.
+
+Вначале создадим отдельную таблицу только с данными по этой платформе.
+Назовём её PS2_data.
+
+
++*In[64]:*+
+[source, ipython3]
+----
+PS2_data = games_actual_data[(games_actual_data['platform'] == 'PS2')]
+----
+
+
++*In[65]:*+
+[source, ipython3]
+----
+PS2_data 
+----
+
+
++*Out[65]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|17 |Grand Theft Auto: San Andreas |PS2 |2004 |Action |9.43 |0.40 |0.41
+|10.57 |95.000000 |9.00000 |M |20.81
+
+|24 |Grand Theft Auto: Vice City |PS2 |2002 |Action |8.41 |5.49 |0.47
+|1.78 |95.000000 |8.70000 |M |16.15
+
+|28 |Gran Turismo 3: A-Spec |PS2 |2001 |Racing |6.85 |5.09 |1.87 |1.16
+|95.000000 |8.40000 |E |14.97
+
+|38 |Grand Theft Auto III |PS2 |2001 |Action |6.99 |4.51 |0.30 |1.30
+|97.000000 |8.50000 |M |13.10
+
+|48 |Gran Turismo 4 |PS2 |2004 |Racing |3.01 |0.01 |1.10 |7.53
+|89.000000 |8.50000 |E |11.65
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16670 |Sugar + Spice! Anoko no Suteki na Nanimokamo |PS2 |2008
+|Adventure |0.00 |0.00 |0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16671 |Kanokon: Esuii |PS2 |2008 |Adventure |0.00 |0.00 |0.01 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16683 |Scarlett: Nichijou no Kyoukaisen |PS2 |2008 |Adventure |0.00
+|0.00 |0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16689 |Real Rode |PS2 |2008 |Adventure |0.00 |0.00 |0.01 |0.00
+|68.994363 |7.12633 |tbd |0.01
+
+|16709 |SCORE International Baja 1000: The Official Game |PS2 |2008
+|Racing |0.00 |0.00 |0.00 |0.00 |68.994363 |7.12633 |tbd |0.00
+|===
+
+2045 rows × 12 columns
+----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+критиков''.
+
+
++*In[66]:*+
+[source, ipython3]
+----
+PS2_data.plot(x = 'critic_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы критиков" платформы  PS2')
+----
+
+
++*Out[66]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы критиков" платформы  PS2')
+![png](output_146_1.png)
+----
+
+
+Видим, что основная масса оценок критиков сосредоточена в диапазоне от
+60 до 90, т. е. большинству критиков нравятся игры, производимые PS2.
+
+Посчитаем корреляцию между этими параметрами.
+
+
++*In[67]:*+
+[source, ipython3]
+----
+PS2_data['critic_score'].corr(PS2_data['total_sales'])
+----
+
+
++*Out[67]:*+
+----0.36440133396344204----
+
+Связь есть, однако не очень сильная. Высокие оценки большинства критиков
+довольно слабо влияют на продажи игр этой платформы.
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+пользователей''.
+
+
++*In[68]:*+
+[source, ipython3]
+----
+PS2_data.plot(x = 'user_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы пользователей" платформы  PS2')
+----
+
+
++*Out[68]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы пользователей" платформы  PS2')
+![png](output_154_1.png)
+----
+
+Оценки большинства пользователей находятся в диапазоне от 6 до 9, что
+совпадает с оценками большинства критиков.
+
+Посмотрим на корреляцию в этой паре.
+
+
++*In[69]:*+
+[source, ipython3]
+----
+PS2_data['user_score'].corr(PS2_data['total_sales'])
+----
+
+
++*Out[69]:*+
+----0.2110491518898845----
+
+Она ещё ниже, чем у оценок критиков. Получается, что для большинства
+пользователей игр платформы PS2 оценки других людей не играют
+практически никакой роли при покупке.
+
+Сравним эти данные с другими платформами из первой пятёрки по прибыли.
+
+Возьмём данные по платформе X360, которая показывает второй результат по
+прибыли.
+
+Cоздадим отдельную таблицу только с данными по этой платформе. Назовём
+её X360_data.
+
+
++*In[70]:*+
+[source, ipython3]
+----
+X360_data = games_actual_data[(games_actual_data['platform'] == 'X360')]
+----
+
+
++*In[71]:*+
+[source, ipython3]
+----
+X360_data
+----
+
+
++*Out[71]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|14 |Kinect Adventures! |X360 |2010 |Misc |15.00 |4.89 |0.24 |1.69
+|61.000000 |6.30000 |E |21.82
+
+|23 |Grand Theft Auto V |X360 |2013 |Action |9.66 |5.14 |0.06 |1.41
+|97.000000 |8.10000 |M |16.27
+
+|29 |Call of Duty: Modern Warfare 3 |X360 |2011 |Shooter |9.04 |4.24
+|0.13 |1.32 |88.000000 |3.40000 |M |14.73
+
+|32 |Call of Duty: Black Ops |X360 |2010 |Shooter |9.70 |3.68 |0.11
+|1.13 |87.000000 |6.30000 |M |14.62
+
+|35 |Call of Duty: Black Ops II |X360 |2012 |Shooter |8.25 |4.24 |0.07
+|1.12 |83.000000 |4.80000 |M |13.68
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16613 |Dragon Ball Z for Kinect |X360 |2012 |Fighting |0.01 |0.00 |0.00
+|0.00 |49.000000 |2.10000 |T |0.01
+
+|16622 |World Snooker Championship 2007 |X360 |2007 |Sports |0.00 |0.01
+|0.00 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16647 |Metal Gear Solid HD Edition |X360 |2011 |Action |0.00 |0.00
+|0.01 |0.00 |68.994363 |7.12633 |M |0.01
+
+|16654 |Ben 10 Omniverse 2 |X360 |2013 |Action |0.00 |0.01 |0.00 |0.00
+|68.994363 |5.10000 |E10+ |0.01
+
+|16711 |LMA Manager 2007 |X360 |2006 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.01
+|===
+
+1219 rows × 12 columns
+----
+
+Построим для неё диаграмму рассеяния по паре ``продажи — отзывы
+критиков''.
+
+
++*In[72]:*+
+[source, ipython3]
+----
+X360_data.plot(x = 'critic_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы критиков" платформы X360')
+----
+
+
++*Out[72]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы критиков" платформы X360')
+![png](output_164_1.png)
+----
+
+Это распределение похоже на то, которое мы видели у PS2. Только здесь
+основная масса оценок ещё несколько выше.
+
+Посчитаем корреляцию между этими параметрами.
+
+
++*In[73]:*+
+[source, ipython3]
+----
+X360_data['critic_score'].corr(X360_data['total_sales'])
+----
+
+
++*Out[73]:*+
+----0.3747645980493394----
+
+Оценки немного выше, чем у PS2, и так же немного выше корреляция. Однако
+всё же она весьма мала.
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+пользователей''.
+
+
++*In[74]:*+
+[source, ipython3]
+----
+X360_data.plot(x = 'user_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы пользователей" платформы X360')
+----
+
+
++*Out[74]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы пользователей" платформы X360')
+![png](output_170_1.png)
+----
+
+Оценки пользователей данной платформы распределены более равномерно,
+нежели оценки критиков.
+
+Посчитаем корреляцию для этой пары.
+
+
++*In[75]:*+
+[source, ipython3]
+----
+X360_data['user_score'].corr(X360_data['total_sales'])
+----
+
+
++*Out[75]:*+
+----0.0808224885359775----
+
+Корреляция совсем незначительная. Данные по этой платформе также
+подтверждает отсутствие для покупателей игр важности оценок других
+пользователей.
+
+Посмотрим теперь на платформу PS3 — третье место по прибыли.
+
+Вначале создадим отдельную таблицу только с данными по этой платформе.
+Назовём её PS3_data.
+
+
++*In[76]:*+
+[source, ipython3]
+----
+PS3_data = games_actual_data[(games_actual_data['platform'] == 'PS3')]
+----
+
+
++*In[77]:*+
+[source, ipython3]
+----
+PS3_data
+----
+
+
++*Out[77]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|16 |Grand Theft Auto V |PS3 |2013 |Action |7.02 |9.09 |0.98 |3.96
+|97.000000 |8.20000 |M |21.05
+
+|34 |Call of Duty: Black Ops II |PS3 |2012 |Shooter |4.99 |5.73 |0.65
+|2.42 |83.000000 |5.30000 |M |13.79
+
+|37 |Call of Duty: Modern Warfare 3 |PS3 |2011 |Shooter |5.54 |5.73
+|0.49 |1.57 |88.000000 |3.20000 |M |13.33
+
+|41 |Call of Duty: Black Ops |PS3 |2010 |Shooter |5.99 |4.37 |0.48 |1.79
+|88.000000 |6.40000 |M |12.63
+
+|54 |Gran Turismo 5 |PS3 |2010 |Racing |2.96 |4.82 |0.81 |2.11
+|84.000000 |7.50000 |E |10.70
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16628 |Akatsuki no Goei Trinity |PS3 |2012 |Adventure |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16638 |Tour de France 2014 |PS3 |2014 |Sports |0.00 |0.01 |0.00 |0.00
+|68.994363 |7.12633 |E |0.01
+
+|16639 |WSC REAL 09: World Snooker Championship |PS3 |2009 |Sports |0.00
+|0.01 |0.00 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16674 |Tsukigime Ranko's Longest Day |PS3 |2014 |Action |0.00 |0.01
+|0.00 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16676 |G1 Jockey 4 2008 |PS3 |2008 |Sports |0.00 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |tbd |0.00
+|===
+
+1268 rows × 12 columns
+----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+критиков''.
+
+
++*In[78]:*+
+[source, ipython3]
+----
+PS3_data.plot(x = 'critic_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы критиков" платформы PS3')
+----
+
+
++*Out[78]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы критиков" платформы PS3')
+![png](output_180_1.png)
+----
+
+Посчитаем корреляцию между этими параметрами.
+
+
++*In[79]:*+
+[source, ipython3]
+----
+PS3_data['critic_score'].corr(PS3_data['total_sales'])
+----
+
+
++*Out[79]:*+
+----0.41962961537293925----
+
+Здесь корреляция выше, чем у предыдущих платформ, но всё равно слабая.
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+пользователей''.
+
+
++*In[80]:*+
+[source, ipython3]
+----
+PS3_data.plot(x = 'user_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы пользователей" платформы PS3')
+----
+
+
++*Out[80]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы пользователей" платформы PS3')
+![png](output_185_1.png)
+----
+
+Результаты чуть хуже, чем у PS2 и X360; так, очень мало игр получили
+оценку 9.
+
+Посмотрим на корреляцию в этой паре.
+
+
++*In[81]:*+
+[source, ipython3]
+----
+PS3_data['user_score'].corr(PS3_data['total_sales'])
+----
+
+
++*Out[81]:*+
+----0.07958655114789275----
+
+Корреляция очень слабая.
+
+Платформа Wii —четвёртое место по прибыли.
+
+Вначале создадим отдельную таблицу только с данными по этой платформе.
+Назовём её Wii_data.
+
+
++*In[82]:*+
+[source, ipython3]
+----
+Wii_data = games_actual_data[(games_actual_data['platform'] == 'Wii')]
+----
+
+
++*In[83]:*+
+[source, ipython3]
+----
+Wii_data
+----
+
+
++*Out[83]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|0 |Wii Sports |Wii |2006 |Sports |41.36 |28.96 |3.77 |8.45 |76.000000
+|8.00000 |E |82.54
+
+|2 |Mario Kart Wii |Wii |2008 |Racing |15.68 |12.76 |3.79 |3.29
+|82.000000 |8.30000 |E |35.52
+
+|3 |Wii Sports Resort |Wii |2009 |Sports |15.61 |10.93 |3.28 |2.95
+|80.000000 |8.00000 |E |32.77
+
+|7 |Wii Play |Wii |2006 |Misc |13.96 |9.18 |2.93 |2.84 |58.000000
+|6.60000 |E |28.91
+
+|8 |New Super Mario Bros. Wii |Wii |2009 |Platform |14.44 |6.94 |4.70
+|2.24 |87.000000 |8.40000 |E |28.32
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16589 |Bomberman |Wii |2008 |Puzzle |0.00 |0.00 |0.01 |0.00 |68.994363
+|7.12633 |tbd |0.01
+
+|16626 |The Ultimate Battle of the Sexes |Wii |2010 |Misc |0.01 |0.00
+|0.00 |0.00 |68.994363 |7.12633 |T |0.01
+
+|16664 |Mahou Sensei Negima!? Neo-Pactio Fight!! |Wii |2007 |Fighting
+|0.00 |0.00 |0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16685 |Help Wanted: 50 Wacky Jobs (jp sales) |Wii |2008 |Simulation
+|0.00 |0.00 |0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16686 |Yattaman Wii: BikkuriDokkiri Machine de Mou Ra... |Wii |2008
+|Racing |0.00 |0.00 |0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+|===
+
+1285 rows × 12 columns
+----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+критиков''.
+
+
++*In[84]:*+
+[source, ipython3]
+----
+Wii_data.plot(x = 'critic_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы критиков" платформы Wii')
+----
+
+
++*Out[84]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы критиков" платформы Wii')
+![png](output_195_1.png)
+----
+
+Посчитаем корреляцию между этими параметрами.
+
+
++*In[85]:*+
+[source, ipython3]
+----
+Wii_data['critic_score'].corr(Wii_data['total_sales'])
+----
+
+
++*Out[85]:*+
+----0.12381309281354695----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+пользователей''.
+
+
++*In[86]:*+
+[source, ipython3]
+----
+Wii_data.plot(x = 'user_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы пользователей" платформы Wii')
+----
+
+
++*Out[86]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы пользователей" платформы Wii')
+![png](output_199_1.png)
+----
+
+Посмотрим на корреляцию в этой паре.
+
+
++*In[87]:*+
+[source, ipython3]
+----
+Wii_data['user_score'].corr(Wii_data['total_sales'])
+----
+
+
++*Out[87]:*+
+----0.08291250898565222----
+
+И на этой платформе в обоих случаях видим очень слабую корреляцию.
+
+Последняя анализируемая нами платформа — DS — пятое место по прибыли.
+
+Вначале создадим отдельную таблицу только с данными по этой платформе.
+Назовём её DS_data.
+
+
++*In[88]:*+
+[source, ipython3]
+----
+DS_data = games_actual_data[(games_actual_data['platform'] == 'DS')]
+----
+
+
++*In[89]:*+
+[source, ipython3]
+----
+DS_data
+----
+
+
++*Out[89]:*+
+----
+[cols=",,,,,,,,,,,,",options="header",]
+|===
+| |name |platform |year_of_release |genre |na_sales |eu_sales |jp_sales
+|other_sales |critic_score |user_score |rating |total_sales
+|6 |New Super Mario Bros. |DS |2006 |Platform |11.28 |9.14 |6.50 |2.88
+|89.000000 |8.50000 |E |29.80
+
+|10 |Nintendogs |DS |2005 |Simulation |9.05 |10.95 |1.93 |2.74
+|68.994363 |7.12633 |tbd |24.67
+
+|11 |Mario Kart DS |DS |2005 |Racing |9.71 |7.47 |4.13 |1.90 |91.000000
+|8.60000 |E |23.21
+
+|19 |Brain Age: Train Your Brain in Minutes a Day |DS |2005 |Misc |4.74
+|9.20 |4.16 |2.04 |77.000000 |7.90000 |E |20.14
+
+|20 |Pokemon Diamond/Pokemon Pearl |DS |2006 |Role-Playing |6.38 |4.46
+|6.04 |1.36 |68.994363 |7.12633 |tbd |18.24
+
+|... |... |... |... |... |... |... |... |... |... |... |... |...
+
+|16656 |Imagine Figure Skater (JP sales) |DS |2007 |Sports |0.00 |0.00
+|0.01 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16675 |Original Frisbee Disc Sports: Ultimate & Golf |DS |2007 |Action
+|0.01 |0.00 |0.00 |0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16698 |Mega Brain Boost |DS |2008 |Puzzle |0.01 |0.00 |0.00 |0.00
+|48.000000 |7.12633 |E |0.01
+
+|16700 |Mezase!! Tsuri Master DS |DS |2009 |Sports |0.00 |0.00 |0.01
+|0.00 |68.994363 |7.12633 |tbd |0.01
+
+|16704 |Plushees |DS |2008 |Simulation |0.01 |0.00 |0.00 |0.00
+|68.994363 |7.12633 |E |0.01
+|===
+
+2120 rows × 12 columns
+----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+критиков''.
+
+
++*In[90]:*+
+[source, ipython3]
+----
+DS_data.plot(x = 'critic_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы критиков" платформы DS')
+----
+
+
++*Out[90]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы критиков" платформы DS')
+![png](output_208_1.png)
+----
+
+Посчитаем корреляцию между этими параметрами.
+
+
++*In[91]:*+
+[source, ipython3]
+----
+DS_data['critic_score'].corr(DS_data['total_sales'])
+----
+
+
++*Out[91]:*+
+----0.14155767887321338----
+
+Построим теперь диаграмму рассеяния для пары ``продажи — отзывы
+пользователей''.
+
+
++*In[92]:*+
+[source, ipython3]
+----
+PS2_data.plot(x = 'user_score', y = 'total_sales', kind='scatter')
+plt.title('Диаграмма рассеяния "продажи — отзывы пользователей" платформы DS')
+----
+
+
++*Out[92]:*+
+----Text(0.5, 1.0, 'Диаграмма рассеяния "продажи — отзывы пользователей" платформы DS')
+![png](output_212_1.png)
+----
+
+Посмотрим на корреляцию в этой паре.
+
+
++*In[93]:*+
+[source, ipython3]
+----
+DS_data['user_score'].corr(DS_data['total_sales'])
+----
+
+
++*Out[93]:*+
+----0.0908500109786311----
+
+Данные по платформе DS так же подтвердили очень незначительную
+корреляцию.
+
+Вывод:
+
+Оценки других пользователей для подавляющего числа покупателей игр не
+имеют почти никакого значения.
+
+Оценки критиков немного более значимы для покупателей игр, но их
+значение так же не слишком велико.
+
+Обе эти тенденции неизменны на протяжении 15 исследуемых лет
+(2001-2015).
+
+
+Теперь посмотрим на общее распределение игр по жанрам, отсортированное
+по убыванию.
+
+
++*In[94]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['name'].count().sort_values(ascending=False)
+----
+
+
++*Out[94]:*+
+----genre
+Action          2857
+Sports          1850
+Misc            1545
+Role-Playing    1217
+Adventure       1122
+Shooter         1062
+Racing           968
+Simulation       735
+Platform         681
+Fighting         595
+Strategy         520
+Puzzle           466
+Name: name, dtype: int64----
+
+Посмотрим на прибыль разных жанров, сохранив её в сводной таблице
+total_sales_by_genres, отсортированной по убыванию.
+
+
++*In[95]:*+
+[source, ipython3]
+----
+total_sales_by_genres = games_actual_data.pivot_table(
+    index = 'genre', values = 'total_sales', aggfunc = 'sum').sort_values(by = 'total_sales', ascending=False)
+total_sales_by_genres = total_sales_by_genres.reset_index()
+total_sales_by_genres
+----
+
+
++*Out[95]:*+
+----
+[cols=",,",options="header",]
+|===
+| |genre |total_sales
+|0 |Action |1462.07
+|1 |Sports |1066.19
+|2 |Shooter |867.65
+|3 |Misc |700.20
+|4 |Role-Playing |683.99
+|5 |Racing |538.27
+|6 |Platform |475.14
+|7 |Simulation |330.15
+|8 |Fighting |287.17
+|9 |Adventure |176.96
+|10 |Puzzle |134.36
+|11 |Strategy |105.40
+|===
+----
+
+Представим эти данные графически.
+
+
++*In[96]:*+
+[source, ipython3]
+----
+plt.figure(figsize = (12,6))
+plt.title('Распределение игр по жанрам ',fontsize = 15)
+sns.barplot(data = total_sales_by_genres, x = 'genre', y = 'total_sales')
+plt.xlabel('Жанры игр',fontsize = 12)
+plt.ylabel('Продажи',fontsize = 12)
+----
+
+
++*Out[96]:*+
+----Text(0, 0.5, 'Продажи')
+![png](output_223_1.png)
+----
+
+Самыми прибыльными (принесли суммарно более миллиарда долларов по
+каждому жанру), а значит, и самыми популярными были активные и
+спортивные игры. Наименее прибыльными и популярными (принесли суммарно
+меньше 200 миллионов долларов по каждому жанру) были игры жанров
+``приключения'', ``паззлы'' и ``стратегии''.
+
+
+Посмотрим на распределение средних значений продаж, сохранив его в
+сводной таблице mean_sales_by_genres, отсортированной по убыванию.
+
+
++*In[97]:*+
+[source, ipython3]
+----
+mean_sales_by_genres = games_actual_data.pivot_table(
+    index = 'genre', values = 'total_sales', aggfunc = 'mean').sort_values(by = 'total_sales', ascending=False)
+mean_sales_by_genres = mean_sales_by_genres.reset_index()
+mean_sales_by_genres
+----
+
+
++*Out[97]:*+
+----
+[cols=",,",options="header",]
+|===
+| |genre |total_sales
+|0 |Shooter |0.816996
+|1 |Platform |0.697709
+|2 |Sports |0.576319
+|3 |Role-Playing |0.562030
+|4 |Racing |0.556064
+|5 |Action |0.511750
+|6 |Fighting |0.482639
+|7 |Misc |0.453204
+|8 |Simulation |0.449184
+|9 |Puzzle |0.288326
+|10 |Strategy |0.202692
+|11 |Adventure |0.157718
+|===
+----
+
+Представим эти данные графически.
+
+
++*In[98]:*+
+[source, ipython3]
+----
+plt.figure(figsize = (12,6))
+plt.title('Распределение игр по жанрам ',fontsize = 15)
+sns.barplot(data = mean_sales_by_genres, x = 'genre', y = 'total_sales')
+plt.xlabel('Жанры игр',fontsize = 12)
+plt.ylabel('Продажи',fontsize = 12)
+----
+
+
++*Out[98]:*+
+----Text(0, 0.5, 'Продажи')
+![png](output_229_1.png)
+----
+
+По средним показателям прибыли наиболее популярны ``стрелялки'' и
+платформы, наименее — всё те же паззлы, стратегии и приключения.
+
+== Этап 4. Составляем портрет пользователей каждого региона.
+
+Определим для пользователей каждого региона (Северная Америка (NA),
+Европа (EU) и Япония (JP)) топ 5 самых популярных платформ.
+
+Построим для этого сводную таблицу под названием platforms_by_regions и
+выведем её на экран.
+
+
++*In[99]:*+
+[source, ipython3]
+----
+platforms_by_regions = games_actual_data.pivot_table(index = 'platform', values = ['na_sales', 'eu_sales', 'jp_sales'], aggfunc = sum)
+----
+
+
++*In[100]:*+
+[source, ipython3]
+----
+platforms_by_regions.reset_index()
+platforms_by_regions
+----
+
+
++*Out[100]:*+
+----
+eu_sales
+
+jp_sales
+
+na_sales
+
+platform
+
+3DS
+
+58.94
+
+92.59
+
+78.51
+
+DC
+
+0.00
+
+1.42
+
+0.00
+
+DS
+
+188.41
+
+175.00
+
+380.31
+
+GB
+
+1.67
+
+4.65
+
+2.73
+
+GBA
+
+74.57
+
+46.56
+
+184.07
+
+GC
+
+38.32
+
+21.34
+
+131.94
+
+N64
+
+0.54
+
+0.53
+
+2.14
+
+PC
+
+116.36
+
+0.08
+
+59.54
+
+PS
+
+16.39
+
+5.50
+
+19.77
+
+PS2
+
+321.99
+
+128.67
+
+556.84
+
+PS3
+
+325.95
+
+78.11
+
+389.46
+
+PS4
+
+109.31
+
+10.22
+
+87.25
+
+PSP
+
+65.62
+
+75.88
+
+107.27
+
+PSV
+
+12.68
+
+18.28
+
+12.32
+
+WS
+
+0.00
+
+0.28
+
+0.00
+
+Wii
+
+258.21
+
+68.28
+
+486.81
+
+WiiU
+
+23.65
+
+12.34
+
+36.00
+
+X360
+
+267.61
+
+12.30
+
+595.05
+
+XB
+
+59.44
+
+1.38
+
+181.32
+
+XOne
+
+41.96
+
+0.33
+
+78.85
+----
+
+Сначала найдём 5 самых популярных платформ среди пользователей из
+Северной Америки. Для этого отсортируем полученную сводную таблицу по
+столбцу `na_sales' по убыванию, сохранив результат в переменной
+sorted_na_sales.
+
+
++*In[101]:*+
+[source, ipython3]
+----
+sorted_na_sales = platforms_by_regions.sort_values(by = ['na_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `na_sales'.
+
+
++*In[102]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales']
+----
+
+
++*Out[102]:*+
+----platform
+X360    595.05
+PS2     556.84
+Wii     486.81
+PS3     389.46
+DS      380.31
+GBA     184.07
+XB      181.32
+GC      131.94
+PSP     107.27
+PS4      87.25
+XOne     78.85
+3DS      78.51
+PC       59.54
+WiiU     36.00
+PS       19.77
+PSV      12.32
+GB        2.73
+N64       2.14
+DC        0.00
+WS        0.00
+Name: na_sales, dtype: float64----
+
+Теперь выведем 5 самых популярных платформ.
+
+
++*In[103]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales'].head()
+----
+
+
++*Out[103]:*+
+----platform
+X360    595.05
+PS2     556.84
+Wii     486.81
+PS3     389.46
+DS      380.31
+Name: na_sales, dtype: float64----
+
+Как видим, разница в объёмах продаж между ведущими платформами на
+североамериканском рынке не очень большая.
+
+Теперь посмотрим на европейский рынок.
+
+Найдём 5 самых популярных платформ среди пользователей из Европы. Для
+этого отсортируем полученную сводную таблицу по столбцу `eu_sales' по
+убыванию, сохранив результат в переменной sorted_eu_sales.
+
+
++*In[104]:*+
+[source, ipython3]
+----
+sorted_eu_sales = platforms_by_regions.sort_values(by = ['eu_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `eu_sales'.
+
+
++*In[105]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales']
+----
+
+
++*Out[105]:*+
+----platform
+PS3     325.95
+PS2     321.99
+X360    267.61
+Wii     258.21
+DS      188.41
+PC      116.36
+PS4     109.31
+GBA      74.57
+PSP      65.62
+XB       59.44
+3DS      58.94
+XOne     41.96
+GC       38.32
+WiiU     23.65
+PS       16.39
+PSV      12.68
+GB        1.67
+N64       0.54
+DC        0.00
+WS        0.00
+Name: eu_sales, dtype: float64----
+
+Выведем 5 самых популярных платформ.
+
+
++*In[106]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales'].head()
+----
+
+
++*Out[106]:*+
+----platform
+PS3     325.95
+PS2     321.99
+X360    267.61
+Wii     258.21
+DS      188.41
+Name: eu_sales, dtype: float64----
+
+Как видим, здесь есть отличие от рынка Северной Америки: находящаяся на
+нём на первом месте платформа X360 в Европе занимает третью позицию, а
+стоящая в североамериканской рейтинге на четвёртом месте PS3 — в Европе
+первая по продажам.
+
+Нужно также отметить то, что разница между доходами первого и последнего
+членов ведущей пятёрки в Европе примерно такая же, как и в Северной
+Америке. А вот сами объёмы продаж намного скромнее: европейский лидер по
+ним не дотягивает даже до тех цифр, которые есть у пятой строчки
+североамериканского рейтинга.
+
+Что интересно, платформа PS2 и в Европе, и в Северной Америке находится
+на втором месте по суммарным продажам.
+
+Теперь проанализируем рынок компьютерных игр Японии.
+
+Найдём 5 самых популярных платформ среди пользователей из этой страны.
+Для этого отсортируем полученную сводную таблицу по столбцу `jp_sales'
+по убыванию, сохранив результат в переменной sorted_jp_sales.
+
+
++*In[107]:*+
+[source, ipython3]
+----
+sorted_jp_sales = platforms_by_regions.sort_values(by = ['jp_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `jp_sales'.
+
+
++*In[108]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales']
+----
+
+
++*Out[108]:*+
+----platform
+DS      175.00
+PS2     128.67
+3DS      92.59
+PS3      78.11
+PSP      75.88
+Wii      68.28
+GBA      46.56
+GC       21.34
+PSV      18.28
+WiiU     12.34
+X360     12.30
+PS4      10.22
+PS        5.50
+GB        4.65
+DC        1.42
+XB        1.38
+N64       0.53
+XOne      0.33
+WS        0.28
+PC        0.08
+Name: jp_sales, dtype: float64----
+
+Выведем 5 самых популярных платформ.
+
+
++*In[109]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales'].head()
+----
+
+
++*Out[109]:*+
+----platform
+DS     175.00
+PS2    128.67
+3DS     92.59
+PS3     78.11
+PSP     75.88
+Name: jp_sales, dtype: float64----
+
+Да, продажи игр в Японии значительно скромнее европейских, не говоря уже
+о североамериканских. Самая прибыльная в этой стране платформа по их
+объёмам меньше пятой строчки европейского рейтинга. Нельзя не отметить
+то, что этой платформой-лидером в Японии является DS, занимающая пятую
+позицию в североамериканском и европейском рейтингах.
+
+Разница в продажах пяти наиболее популярных платформ в Японии ещё
+меньше, чем в Северной Америке и Европе.
+
+Здесь также присутствуют платформы 3DS и PSP, гораздо менее популярные в
+Европе и Северной Америке.
+
+И, наконец, самое удивительное — платформа PS2 и здесь на втором месте!
+
+Вывод:
+
+Предпочтения по платформам североамериканских и европейских
+пользователей довольно похожи между собой и, можно сказать, в основном
+совпадают. Единственное, что жители Северной Америки играют в
+компьютерные игры чаще, чем европейцы.
+
+Японцы отличаются намного сильнее: они и играют значительно меньше, и
+платформы у них в основном популярнее другие, чем у европейцев и
+североамериканцев.
+
+Интересный феномен представляет популярная во всех трёх регионах
+платформа PS2, везде занимающая второе место. Однако это уже тема для
+отдельного исследования.
+
+Исследуем самые популярные жанры компьютерных игр в этих трёх регионах.
+
+Построим для этого сводную таблицу под названием genres_by_regions и
+выведем её на экран.
+
+
++*In[110]:*+
+[source, ipython3]
+----
+genres_by_regions = games_actual_data.pivot_table(index = 'genre', values = ['na_sales', 'eu_sales', 'jp_sales'], aggfunc = sum)
+----
+
+
++*In[111]:*+
+[source, ipython3]
+----
+genres_by_regions.reset_index()
+genres_by_regions
+----
+
+
++*Out[111]:*+
+----
+eu_sales
+
+jp_sales
+
+na_sales
+
+genre
+
+Action
+
+445.06
+
+121.42
+
+725.19
+
+Adventure
+
+47.49
+
+35.05
+
+80.17
+
+Fighting
+
+66.86
+
+41.09
+
+149.24
+
+Misc
+
+191.14
+
+81.62
+
+357.37
+
+Platform
+
+133.97
+
+52.60
+
+248.39
+
+Puzzle
+
+38.81
+
+23.20
+
+62.42
+
+Racing
+
+183.75
+
+26.58
+
+260.58
+
+Role-Playing
+
+147.20
+
+219.30
+
+269.21
+
+Shooter
+
+275.95
+
+22.02
+
+474.99
+
+Simulation
+
+102.66
+
+38.56
+
+160.90
+
+Sports
+
+317.80
+
+68.60
+
+559.10
+
+Strategy
+
+30.93
+
+23.70
+
+42.62
+----
+
+Сначала найдём 5 самых популярных жанров среди пользователей из Северной
+Америки. Для этого отсортируем полученную сводную таблицу по столбцу
+`na_sales' по убыванию, сохранив результат в переменной sorted_na_sales.
+
+
++*In[112]:*+
+[source, ipython3]
+----
+sorted_na_sales = genres_by_regions.sort_values(by = ['na_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `na_sales'.
+
+
++*In[113]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales']
+----
+
+
++*Out[113]:*+
+----genre
+Action          725.19
+Sports          559.10
+Shooter         474.99
+Misc            357.37
+Role-Playing    269.21
+Racing          260.58
+Platform        248.39
+Simulation      160.90
+Fighting        149.24
+Adventure        80.17
+Puzzle           62.42
+Strategy         42.62
+Name: na_sales, dtype: float64----
+
+Теперь выведем 5 самых популярных жанров.
+
+
++*In[114]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales'].head()
+----
+
+
++*Out[114]:*+
+----genre
+Action          725.19
+Sports          559.10
+Shooter         474.99
+Misc            357.37
+Role-Playing    269.21
+Name: na_sales, dtype: float64----
+
+В первую очередь бросается в глаза то, что это распределение жанров
+полностью соответствует выявленному нами ранее общемировому. Отдельно
+нужно отметить большой отрыв игр жанра ``Action'' от остальных наиболее
+популярных и даже от второго места.
+
+Сравним эти данные с европейскими.
+
+Найдём 5 самых популярных жанров среди пользователей из Европы. Для
+этого отсортируем полученную сводную таблицу по столбцу `eu_sales' по
+убыванию, сохранив результат в переменной sorted_eu_sales.
+
+
++*In[115]:*+
+[source, ipython3]
+----
+sorted_eu_sales = genres_by_regions.sort_values(by = ['eu_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `eu_sales'.
+
+
++*In[116]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales']
+----
+
+
++*Out[116]:*+
+----genre
+Action          445.06
+Sports          317.80
+Shooter         275.95
+Misc            191.14
+Racing          183.75
+Role-Playing    147.20
+Platform        133.97
+Simulation      102.66
+Fighting         66.86
+Adventure        47.49
+Puzzle           38.81
+Strategy         30.93
+Name: eu_sales, dtype: float64----
+
+Выведем 5 самых популярных жанров.
+
+
++*In[117]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales'].head()
+----
+
+
++*Out[117]:*+
+----genre
+Action     445.06
+Sports     317.80
+Shooter    275.95
+Misc       191.14
+Racing     183.75
+Name: eu_sales, dtype: float64----
+
+Снова, как и в сравнении по платформам, видим значительно более низкие
+объёмы продаж по европейскому рынку. Однако это не влияет на
+распределение жанров по популярности — в Европе оно почти такое же, как
+и в Северной Америке. За одним исключением — ``Racing'' здесь обогнал
+``Role-Playing''.
+
+Теперь посмотрим, игры каких жанров наиболее популярны в Японии.
+
+Найдём 5 самых популярных жанров среди пользователей из этой страны. Для
+этого отсортируем полученную сводную таблицу по столбцу `jp_sales' по
+убыванию, сохранив результат в переменной sorted_jp_sales.
+
+
++*In[118]:*+
+[source, ipython3]
+----
+sorted_jp_sales = genres_by_regions.sort_values(by = ['jp_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `jp_sales'.
+
+
++*In[119]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales']
+----
+
+
++*Out[119]:*+
+----genre
+Role-Playing    219.30
+Action          121.42
+Misc             81.62
+Sports           68.60
+Platform         52.60
+Fighting         41.09
+Simulation       38.56
+Adventure        35.05
+Racing           26.58
+Strategy         23.70
+Puzzle           23.20
+Shooter          22.02
+Name: jp_sales, dtype: float64----
+
+Выведем 5 самых популярных жанров.
+
+
++*In[120]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales'].head()
+----
+
+
++*Out[120]:*+
+----genre
+Role-Playing    219.30
+Action          121.42
+Misc             81.62
+Sports           68.60
+Platform         52.60
+Name: jp_sales, dtype: float64----
+
+Вкусы японцев и здесь существенно отличаются от европейских и
+североамериканских: ролевые игры, стоящие на пятом месте по популярности
+в Северной Америке и на шестом — в Европе, здесь — на первом месте с
+большим отрывом. Правда, нужно отметить, что игры жанров ``Action'',
+``Misc'' и ``Sports'' входят в первую пятёрку популярности во всех трёх
+регионах.
+
+Вывод:
+
+Исследование самых популярных жанров подтвердило выводы, полученные
+ранеее по платформам.
+
+Здесь мы также увидели, что самый большой по объёму рынок —
+североамериканский, следом за ним идёт европейский, и потом уже японский
+с куда меньшими объёмами продаж.
+
+Предпочтения европейцев и североамериканцев почти во всём совпадают, у
+японцев же совсем другой жанр-фаворит.
+
+Однако жанры ``Action'', ``Misc'' и ``Sports'' популярны во всех трёх
+регионах.
+
+Узнаем, влияет ли рейтинг ESRB на продажи в отдельном регионе?
+
+Построим для этого сводную таблицу под названием rating_by_regions и
+выведем её на экран.
+
+
++*In[121]:*+
+[source, ipython3]
+----
+rating_by_regions = games_actual_data.pivot_table(index = 'rating', values = ['na_sales', 'eu_sales', 'jp_sales'], aggfunc = sum)
+----
+
+
++*In[122]:*+
+[source, ipython3]
+----
+rating_by_regions.reset_index()
+rating_by_regions
+----
+
+
++*Out[122]:*+
+----
+eu_sales
+
+jp_sales
+
+na_sales
+
+rating
+
+AO
+
+0.61
+
+0.00
+
+1.26
+
+E
+
+661.77
+
+186.20
+
+1217.24
+
+E10+
+
+179.52
+
+39.75
+
+341.69
+
+EC
+
+0.11
+
+0.00
+
+1.53
+
+M
+
+454.12
+
+55.96
+
+710.20
+
+RP
+
+0.03
+
+0.00
+
+0.00
+
+T
+
+369.33
+
+120.36
+
+680.08
+
+tbd
+
+316.13
+
+351.47
+
+438.18
+----
+
+Сначала найдём 5 самых популярных рейтингов среди пользователей из
+Северной Америки. Для этого отсортируем полученную сводную таблицу по
+столбцу `na_sales' по убыванию, сохранив результат в переменной
+sorted_na_sales.
+
+
++*In[123]:*+
+[source, ipython3]
+----
+sorted_na_sales = rating_by_regions.sort_values(by = ['na_sales'], ascending = False)
+----
+
+Выведем на экран только интересующий нас столбец `na_sales'.
+
+
++*In[124]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales']
+----
+
+
++*Out[124]:*+
+----rating
+E       1217.24
+M        710.20
+T        680.08
+tbd      438.18
+E10+     341.69
+EC         1.53
+AO         1.26
+RP         0.00
+Name: na_sales, dtype: float64----
+
+Выведем 5 самых популярных рейтингов.
+
+
++*In[125]:*+
+[source, ipython3]
+----
+sorted_na_sales['na_sales'].head()
+----
+
+
++*Out[125]:*+
+----rating
+E       1217.24
+M        710.20
+T        680.08
+tbd      438.18
+E10+     341.69
+Name: na_sales, dtype: float64----
+
+Если не считать tbd, то самые популярные рейтинги — это «E» («Everyone»)
+— «Для всех», «M» («Mature») — «Для взрослых», «T» («Teen») —
+«Подросткам» и «E10+» («Everyone 10 and older») — «Для всех от 10 лет и
+старше». Игры ``для всех'' впереди с большим отрывом.
+
+Сравним эти данные с европейскими.
+
+
++*In[126]:*+
+[source, ipython3]
+----
+sorted_eu_sales = rating_by_regions.sort_values(by = ['eu_sales'], ascending = False)
+----
+
+
++*In[127]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales']
+----
+
+
++*Out[127]:*+
+----rating
+E       661.77
+M       454.12
+T       369.33
+tbd     316.13
+E10+    179.52
+AO        0.61
+EC        0.11
+RP        0.03
+Name: eu_sales, dtype: float64----
+
+Выведем первую пятёрку.
+
+
++*In[128]:*+
+[source, ipython3]
+----
+sorted_eu_sales['eu_sales'].head()
+----
+
+
++*Out[128]:*+
+----rating
+E       661.77
+M       454.12
+T       369.33
+tbd     316.13
+E10+    179.52
+Name: eu_sales, dtype: float64----
+
+Результат тот же самый, что и в Северной Америке, только объёмы продаж в
+2 раза ниже.
+
+Посмотрим данные по Японии.
+
+
++*In[129]:*+
+[source, ipython3]
+----
+sorted_jp_sales = rating_by_regions.sort_values(by = ['jp_sales'], ascending = False)
+----
+
+
++*In[130]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales']
+----
+
+
++*Out[130]:*+
+----rating
+tbd     351.47
+E       186.20
+T       120.36
+M        55.96
+E10+     39.75
+AO        0.00
+EC        0.00
+RP        0.00
+Name: jp_sales, dtype: float64----
+
+Выведем первые пять.
+
+
++*In[131]:*+
+[source, ipython3]
+----
+sorted_jp_sales['jp_sales'].head()
+----
+
+
++*Out[131]:*+
+----rating
+tbd     351.47
+E       186.20
+T       120.36
+M        55.96
+E10+     39.75
+Name: jp_sales, dtype: float64----
+
+Благодаря тому, что мы сохранили в таблице значения `tbd', здесь мы
+можем сделать интересный аналитический вывод: `tbd' здесь на первом
+месте, т. е. для японцев рейтинг игры — очень малозначимый параметр при
+покупке. Но без него картина выглядит так же, как в Европе и Северной
+Америке.
+
+Вывод:
+
+Влияние рейтинга ESRB на продажи весьма ограничено. Это видно, в первую
+очередь, по тому, что игры с неопределённым рейтингом (tbd) попали в
+топ-5 во всех трёх регионах, а в Японии даже вышли на первое место с
+большим отрывом.
+
+Во всех трёх регионах наиболее популярны игры с одними и теми же
+рейтингами: «E» («Everyone») — «Для всех», «M» («Mature») — «Для
+взрослых», «T» («Teen») — «Подросткам» и «E10+» («Everyone 10 and
+older») — «Для всех от 10 лет и старше».
+
+Это легко объяснимо: большую часть геймеров во всём мире составляют
+подростки; а Everyone и есть Everyone — этот рейтинг наиболее
+универсален, и играть в такие игры можно уже с 6 лет, поэтому у него
+больше всего пользователей, и, соответственно, продаж.
+
+
+== Этап 5. Статистический анализ данных.
+
+Посмотрим на изменения рейтингов пользователей и критиков в различных
+жанрах.
+
+Начнём с рейтингов пользователей.
+
+Cгруппируем их по жанрам, посчитаем средние оценки и отсортируем их по
+убыванию.
+
+
++*In[132]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].mean().sort_values(ascending = False)
+----
+
+
++*Out[132]:*+
+----genre
+Role-Playing    7.380212
+Platform        7.248456
+Fighting        7.226772
+Strategy        7.175998
+Simulation      7.131472
+Puzzle          7.128235
+Adventure       7.119834
+Action          7.092016
+Shooter         7.071333
+Racing          7.056280
+Sports          7.053415
+Misc            7.034141
+Name: user_score, dtype: float64----
+
+Построим гистограмму распределения средних оценок пользователей.
+
+_число 12 в значении bins здесь и далее — это количество жанров_.
+
+
++*In[133]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].mean().hist(bins = 12, alpha = 0.5)
+----
+
+
++*Out[133]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd3607dd0>
+![png](output_320_1.png)
+----
+
+Видим, что
+
+во-первых: распределение достаточно небольшое (речь идёт о сотых долях)
+
+во-вторых: бо́льшая часть оценок расположена в диапазоне, наиболее
+близком к 7 (от 7.03 до 7.17).
+
+Теперь так же посчитаем дисперсию.
+
+
++*In[134]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].var()
+----
+
+
++*Out[134]:*+
+----genre
+Action          1.169935
+Adventure       0.686420
+Fighting        1.148041
+Misc            0.685220
+Platform        1.302906
+Puzzle          0.608768
+Racing          1.460809
+Role-Playing    0.717218
+Shooter         1.809607
+Simulation      1.095140
+Sports          1.393669
+Strategy        1.499543
+Name: user_score, dtype: float64----
+
+Построим гистограмму распределения для этого показателя.
+
+
++*In[135]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].var().hist(bins = 12, alpha = 0.5)
+----
+
+
++*Out[135]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd359d990>
+![png](output_325_1.png)
+----
+
+Здесь видны 2 пика: первый — высокий — в районе значений около 0.7,
+второй — наиболее часто встречаемый здесь нами диапазон от 1 до 1.5.
+
+И наконец — стандартное отклонение.
+
+
++*In[136]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].std()
+----
+
+
++*Out[136]:*+
+----genre
+Action          1.081635
+Adventure       0.828505
+Fighting        1.071467
+Misc            0.827780
+Platform        1.141449
+Puzzle          0.780236
+Racing          1.208639
+Role-Playing    0.846887
+Shooter         1.345217
+Simulation      1.046489
+Sports          1.180538
+Strategy        1.224558
+Name: user_score, dtype: float64----
+
+.
+
+Построим гистограмму распределения для этого показателя.
+
+
++*In[137]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['user_score'].std().hist(bins = 12, alpha = 0.5)
+----
+
+
++*Out[137]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd350a250>
+![png](output_332_1.png)
+----
+
+Снова видим два пика: один на значениях между 0.8 и 0.9, второй —
+наиболее часто встречаемый здесь нами диапазон от 1.05 до 1.25.
+
+Теперь проделаем всё то же самое со сгруппированными по жанрам
+рейтингами критиков.
+
+Считаем средние оценки.
+
+
++*In[138]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].mean().sort_values(ascending = False)
+----
+
+
++*Out[138]:*+
+----genre
+Sports          70.744210
+Role-Playing    70.734534
+Strategy        70.426201
+Shooter         69.786154
+Fighting        68.960941
+Simulation      68.709758
+Misc            68.176112
+Platform        68.172955
+Puzzle          68.069925
+Racing          68.056157
+Adventure       67.898682
+Action          67.452843
+Name: critic_score, dtype: float64----
+
+Построим гистограмму распределения средних оценок критиков.
+
+
++*In[139]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].mean().hist(bins = 12, alpha = 0.5)
+----
+
+
++*Out[139]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd34a53d0>
+![png](output_338_1.png)
+----
+
+Распределение достаточно ровное, но чётко выделяются два пика: один — на
+68 баллах, другой — значительно меньше — на 70.5.
+
+Cчитаем дисперсию.
+
+
++*In[140]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].var()
+----
+
+
++*Out[140]:*+
+----genre
+Action          124.007439
+Adventure        53.241883
+Fighting        123.261110
+Misc             65.045531
+Platform        118.323824
+Puzzle           76.384731
+Racing          142.574639
+Role-Playing     79.403406
+Shooter         172.910132
+Simulation       67.249450
+Sports          116.198391
+Strategy         73.825245
+Name: critic_score, dtype: float64----
+
+Построим гистограмму распределения для этого показателя.
+
+
++*In[141]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].var().hist(bins = 12, alpha = 0.5)
+----
+
+
++*Out[141]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd33d46d0>
+![png](output_343_1.png)
+----
+
+Чётко различимы жанры с низкой (от 60 до 80+) и высокой (от 116 до 142)
+дисперсией. И отдельно стоят ``шутеры'' с самой большой дисперсией
+оценок — больше 172.
+
+Считаем стандартное отклонение.
+
+
++*In[142]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].std()
+----
+
+
++*Out[142]:*+
+----genre
+Action          11.135863
+Adventure        7.296704
+Fighting        11.102302
+Misc             8.065081
+Platform        10.877676
+Puzzle           8.739836
+Racing          11.940462
+Role-Playing     8.910859
+Shooter         13.149530
+Simulation       8.200576
+Sports          10.779536
+Strategy         8.592162
+Name: critic_score, dtype: float64----
+
+Построим гистограмму распределения для этого показателя.
+
+
++*In[143]:*+
+[source, ipython3]
+----
+games_actual_data.groupby('genre')['critic_score'].std().hist(bins = 12, alpha=0.5)
+----
+
+
++*Out[143]:*+
+----<matplotlib.axes._subplots.AxesSubplot at 0x7f2fd3343b10>
+![png](output_348_1.png)
+----
+
+Очень интересное распределение: довольно много для небольшой выборки
+значений в районе 8-9, целых 4 значения на 11 и по одному — на 12 и 13.
+
+== Этап 6. Проверка гипотез.
+
+Проверим гипотезу о равенстве средних пользовательских рейтингов
+платформ Xbox One и PC.
+
+Сначала подсчитаем средние пользовательские рейтинги для этих платформ.
+
+Средний пользовательский рейтинг игр платформы Xbox One.
+
+
++*In[144]:*+
+[source, ipython3]
+----
+XOne_data = games_actual_data[(games_actual_data['platform'] == 'XOne')]['user_score']
+----
+
+
++*In[145]:*+
+[source, ipython3]
+----
+XOne_data.mean()
+----
+
+
++*Out[145]:*+
+----6.655990720889723----
+
+Для более корректного расчёта посчитаем дисперсию.
+
+
++*In[146]:*+
+[source, ipython3]
+----
+XOne_data.var()
+----
+
+
++*Out[146]:*+
+----1.2847007873997764----
+
+Посмотрим теперь на распределение рейтингов.
+
+
++*In[162]:*+
+[source, ipython3]
+----
+XOne_data.hist()
+plt.title('Распределение рейтингов пользователей на платформе XOne')
+----
+
+
++*Out[162]:*+
+----Text(0.5, 1.0, 'Распределение рейтингов пользователей на платформе XOne')
+![png](output_359_1.png)
+----
+
+Убеждаемся, что распределение нормальное.
+
+Средний пользовательский рейтинг игр платформы PC.
+
+
++*In[148]:*+
+[source, ipython3]
+----
+PC_data = games_actual_data[(games_actual_data['platform'] == 'PC')]['user_score']
+----
+
+
++*In[149]:*+
+[source, ipython3]
+----
+PC_data.mean()
+----
+
+
++*Out[149]:*+
+----7.083942840755829----
+
+Посчитаем дисперсию.
+
+
++*In[150]:*+
+[source, ipython3]
+----
+PC_data.var()
+----
+
+
++*Out[150]:*+
+----1.7854610877808386----
+
+Посмотрим на распределение рейтингов.
+
+
++*In[163]:*+
+[source, ipython3]
+----
+PC_data.hist()
+plt.title('Распределение рейтингов пользователей на платформе PC')
+----
+
+
++*Out[163]:*+
+----Text(0.5, 1.0, 'Распределение рейтингов пользователей на платформе PC')
+![png](output_367_1.png)
+----
+
+Убеждаемся, что распределение нормальное.
+
+Сформулируем нулевую и альтернативную гипотезы.
+
+Нулевая гипотеза: Средние рейтинги платформ Xbox One и PC одинаковые.
+
+Альтернативная гипотеза: Средние рейтинги платформ Xbox One и PC разные.
+
+
+Проверяем гипотезы методом ttest_ind для проверки равенства средних двух
+генеральных совокупностей.
+
+Критерием проверки служит p-значение — уровень значимости, на котором
+находятся друг от друга среднее значение и то, с которым производим
+сравнение.
+
+Значение alpha (критический уровень статистической значимости, с которым
+сравниваем p-значение) устнавливаем на уровне 5 %.
+
+Дисперсии у наших выборок разные, поэтому задаём параметр equal_var =
+False.
+
+
++*In[158]:*+
+[source, ipython3]
+----
+
+alpha = 0.05
+
+results = st.ttest_ind(XOne_data, PC_data, equal_var = False)
+
+print('p-значение:', results.pvalue)
+
+if results.pvalue < alpha:
+    print('Отвергаем нулевую гипотезу')
+else:
+    print('Не получилось отвергнуть нулевую гипотезу') 
+----
+
+
++*Out[158]:*+
+----
+p-значение: 2.9598990431229662e-05
+Отвергаем нулевую гипотезу
+----
+
+Таким образом, вероятность равенства значений для платформ Xbox One и PC
+очень низка (около 3 %), что отвергает нашу нулевую гипотезу.
+
+Проверим гипотезу о том, что пользовательские рейтинги жанров `Action' и
+`Sports' разные.
+
+Сначала подсчитаем средние пользовательские рейтинги для этих жанров.
+
+Средний пользовательский рейтинг игр жанра `Action'.
+
+
++*In[152]:*+
+[source, ipython3]
+----
+Action_data = games_actual_data[(games_actual_data['genre'] == 'Action')]['user_score']
+----
+
+
++*In[153]:*+
+[source, ipython3]
+----
+Action_data.mean()
+----
+
+
++*Out[153]:*+
+----7.09201620070284----
+
+Посчитаем дисперсию.
+
+
++*In[159]:*+
+[source, ipython3]
+----
+Action_data.var()
+----
+
+
++*Out[159]:*+
+----1.1699348258931974----
+
+Посмотрим на распределение рейтингов.
+
+
++*In[164]:*+
+[source, ipython3]
+----
+Action_data.hist()
+plt.title('Распределение рейтингов пользователей для жанра "Action"')
+----
+
+
++*Out[164]:*+
+----Text(0.5, 1.0, 'Распределение рейтингов пользователей для жанра "Action"')
+![png](output_384_1.png)
+----
+
+Убеждаемся, что распределение нормальное.
+
+Средний пользовательский рейтинг игр жанра `Sports'.
+
+
++*In[154]:*+
+[source, ipython3]
+----
+Sports_data = games_actual_data[(games_actual_data['genre'] == 'Sports')]['user_score']
+----
+
+
++*In[155]:*+
+[source, ipython3]
+----
+Sports_data.mean()
+----
+
+
++*Out[155]:*+
+----7.0534145097797785----
+
+Посчитаем дисперсию.
+
+
++*In[165]:*+
+[source, ipython3]
+----
+Sports_data.var()
+----
+
+
++*Out[165]:*+
+----1.3936691641844818----
+
+Посмотрим на распределение рейтингов.
+
+
++*In[166]:*+
+[source, ipython3]
+----
+Sports_data.hist()
+plt.title('Распределение рейтингов пользователей для жанра "Sports"')
+----
+
+
++*Out[166]:*+
+----Text(0.5, 1.0, 'Распределение рейтингов пользователей для жанра "Sports"')
+![png](output_392_1.png)
+----
+
+Убеждаемся, что распределение нормальное.
+
+Сформулируем нулевую и альтернативную гипотезы.
+
+Нулевая гипотеза: Средние пользовательские рейтинги жанров `Action' и
+`Sports' разные.
+
+Альтернативная гипотеза: Средние пользовательские рейтинги жанров
+`Action' и `Sports' одинаковые.
+
+
+Проверяем гипотезы методом ttest_ind для проверки равенства средних двух
+генеральных совокупностей.
+
+Критерием проверки служит p-значение — уровень значимости, на котором
+находятся друг от друга среднее значение и то, с которым производим
+сравнение.
+
+Значение alpha (критический уровень статистической значимости, с которым
+сравниваем p-значение) устнавливаем на уровне 5 %.
+
+Дисперсии у наших выборок разные, поэтому задаём параметр equal_var =
+False.
+
+
++*In[167]:*+
+[source, ipython3]
+----
+alpha = 0.05
+
+results = st.ttest_ind(Action_data, Sports_data, equal_var = False)
+
+print('p-значение:', results.pvalue)
+
+if results.pvalue < alpha:
+    print('Отвергаем нулевую гипотезу')
+else:
+    print('Не получилось отвергнуть нулевую гипотезу') 
+----
+
+
++*Out[167]:*+
+----
+p-значение: 0.2577063504078833
+Не получилось отвергнуть нулевую гипотезу
+----
+
+С 25 %-ной вероятностью средние пользовательские рейтинги жанров
+`Action' и `Sports' будут разными.
+
+Комментарий ревьюера:
+
+Обрати внимание, что наши действия повторяются с точки зрения
+статистических расчетов.
+
+== Этап 7. Общий вывод.
+
+*1.Мы подготовили данные к анализу:*
+
+• привели названия столбцов к нижнему регистру
+
+• преобразовали данные в правильные типы
+
+• обработали пропуски
+
+• выяснили, что означает аббревиатура tbd — «to be determined» («to be
+done»), т. е. «будет определено» приняли решение заменить на значение
+tbd все NaN в столбце «рейтинг», т.к. : 1) значение этого сокращения
+хорошо известно в геймерском сообществе, и, следовательно, будет
+воспринято однозначно 2) это позволяет нам не удалять те строки, у
+которых неизвестен рейтинг
+
+• посчитали глобальные суммарные продажи и записали их в отдельный
+столбец таблицы.
+
+*2.Мы провели исследовательский анализ данных:*
+
+• посмотрели, сколько игр было выпущено в разные годы
+
+• отследили тенденции на рост индустрии игровых платформ до 2008 г. и
+затем начавшийся постепенный спад, ставший резким с 2012 г.; что
+обусловлено всеобщим распространением высокоскоростного Интернета и
+мобильных телефонов, а это в свою очередь сделало наиболее популярными
+онлайн-игры и резко снизило число пользователей игровых приставок
+
+• определили, что для дальнейшего анализа нам нужны только данные,
+начиная с 1994 г., т. к. именно с этого года количество выпускаемых
+платформенных игр стало трёхзначным, т. е. это можно принять за точку
+начала массовой игровой индустрии, до того бывшей нишевым рынком
+
+• посмотрели изменения продаж по платформам в течение исследуемого
+периода, выбрали самые прибыльные из них и построили распределение их
+продаж по годам. Это: 1)подтвердило те тенденции относительно периодов
+роста и спада платформенной игровой индустрии, которые мы выявили ранее
+на данных о том, сколько всего игр было выпущено в разные годы
+2)позволило установить, что средний срок существования одной популярной
+платформы составляет порядка 6 лет.
+
+• Т. к. данные за 2016 г. у нас неполные (по условиям поставленной
+задачи в нашем распоряжении есть статистика на декабрь 2016 г., которая
+включает в себя данные далеко не всех платформ за этот год), мы
+определили период с 2001 по 2015 гг. как наиболее близкий к
+современности и имеющий наиболее полные и актуальные данные и создали
+выборку только с данными за эти 15 лет.
+
+• Мы посмотрели статистику прибыли платформ за исследуемые 15 лет и
+выявили 5 самых прибыльных платформ, которые в дальнейшем анализировали
+(это PS2, X360, PS3, Wii и DS): 1)построили по ним график «ящик с усами»
+и описали полученные данные 2)провели анализ того, как влияют на продажи
+внутри 5 самых популярных платформ отзывы пользователей и критиков
+3)Построили диаграммы рассеяния и посчитали корреляцию между отзывами и
+продажами.
+
+Выявили, что оценки других пользователей для подавляющего числа
+покупателей игр не имеют почти никакого значения (корреляция очень
+слабая). Оценки критиков немного более значимы для покупателей игр, но
+их значение также не слишком велико (корреляция немного выше, но тоже
+довольно слабая). Обе эти тенденции неизменны на протяжении 15
+исследуемых лет (2001-2015).
+
+• Посмотрели на общее распределение игр по жанрам и выявили, что самые
+популярные из них — это активные и спортивные игры (жанры Action и
+Sports), а наименее популярны игры жанров Adventure (приключения),
+Puzzle (паззлы) и Strategy (стратегии).
+
+*3.Мы составили портрет пользователей каждого региона:*
+
+• определили 5 самых популярных платформ для пользователей каждого
+региона: в Северной Америке — это X360, PS2, Wii, PS3 и DS в Европе — те
+же самые платформы, только в другом порядке (первое место занимает PS3)
+в Японии — DS, PS2, 3DS, PS3 и PSP.
+
+• определили 5 самых популярных жанров для пользователей каждого
+региона: в Северной Америке — это Action, Sports, Shooter, Misc и
+Role-Playing в Европе — Action, Sports, Shooter, Misc и Racing в Японии
+— Role-Playing, Action, Misc, Sports и Platform.
+
+• определили 5 самых популярных рейтингов для пользователей каждого
+региона: в Северной Америке — это «E» («Everyone») — «Для всех», «M»
+(«Mature») — «Для взрослых», «T» («Teen») — «Подросткам» и «E10+»
+(«Everyone 10 and older») — «Для всех от 10 лет и старше» + весомая доля
+игр с неопределённым рейтингом (tbd), что говорит о том, что рейтинг
+игры для многих пользователей отнюдь не является определяющим фактором
+при её покупке в Европе — все те же самые, что и в Северной Америке в
+Японии — так же все те же самые рейтинги, что и в Северной Америке и
+Европе + игры с неопределённым рейтингом (tbd) на первом месте с большим
+отрывом
+
+• Всё это позволило нам установить, что:
+
+1)пользователи из Северной Америки играют в компьютерные игры намного
+чаще, чем европейцы, и особенно, чем японцы (объёмы продаж игр в
+Северной Америке — самые большие, далее следует Европа, и в Японии они —
+самые маленькие)
+
+2)предпочтения североамериканских и европейских пользователей
+относительно платформ и рейтингов практически полностью сходятся, а у
+японцев несколько отличаются
+
+3)наиболее популярны во всех трёх регионах игры бренда PlayStation (в
+основном, платформы PS2 и PS3)
+
+4)самые популярные во всех трёх регионах жанры — Action, Sports и Misc,
+в Северной Америке и Европе также очень популярны иры жанра Shooter, а в
+Японии и Северной Америке — Role-Playing
+
+5)влияние рейтинга ESRB на продажи весьма ограничено. Это видно, в
+первую очередь, по тому, что игры с неопределённым рейтингом (tbd)
+попали в топ-5 во всех трёх регионах, а в Японии даже вышли на первое
+место с большим отрывом. Самые популярные рейтинги во всех трёх регионах
+одни и те же: это «E» («Everyone») — «Для всех», «M» («Mature») — «Для
+взрослых», «T» («Teen») — «Подросткам» и «E10+» («Everyone 10 and
+older») — «Для всех от 10 лет и старше». Данное распределение очень
+легко объяснимо: большую часть геймеров во всём мире составляют
+подростки; а рейтинг Everyone наиболее универсален, и играть в такие
+игры можно уже с 6 лет, поэтому у него больше всего пользователей, и,
+соответственно, продаж.
+
+*4.Мы провели статистический анализ данных:*
+
+• посмотрели на изменения рейтингов пользователей и критиков в различных
+жанрах, посчитали среднее количество, дисперсию и стандартное
+отклонение, построили гистограммы и описали распределения
+
+• выяснили, что самая высокая средняя оценка пользователей — у жанра
+Role-Playing — 7,38, самая низкая — у жанра Misc — 7,034.
+
+• у критиков самую высокую среднюю оценку — 70,74 заслужил жанр Sports,
+самую низкую — Action — 67,45.
+
+*5.Мы проверили гипотезы:*
+
+• Средние пользовательские рейтинги платформ Xbox One и PC одинаковые.
+
+• Средние пользовательские рейтинги жанров Action (англ. «действие») и
+Sports (англ. «виды спорта») разные.
+
+• Проведя статистические тесты для проверки равенства средних двух
+генеральных совокупностей, мы пришли к следующим результатам: первую
+гипотезу мы отвергаем, вторую же не получилось отвергнуть.
+
+
+
